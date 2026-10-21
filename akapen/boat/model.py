@@ -53,7 +53,7 @@ def normalize(df: pd.DataFrame, raw: np.ndarray, total: float) -> np.ndarray:
     """レース内で合計が total になるよう正規化（1着確率なら1、3着内なら3）。"""
     s = pd.Series(raw, index=df.index).groupby([df[c] for c in RACE]).transform("sum")
     p = raw / s.values * total
-    return np.clip(p, 1e-6, 1 - 1e-6) if total == 1 else np.clip(p, 1e-6, 1.0)
+    return np.clip(p, 1e-6, 1 - 1e-6) if total == 1 else np.clip(p, 1e-6, 0.99)
 
 
 def labels(df: pd.DataFrame) -> pd.DataFrame:
