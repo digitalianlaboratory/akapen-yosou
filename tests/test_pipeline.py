@@ -63,9 +63,10 @@ def test_history_uses_only_past():
 def test_end_to_end(tmp_path):
     raw, data, mdl, pred = tmp_path / "raw", tmp_path / "data", tmp_path / "model", tmp_path / "pred"
     start = date(2026, 1, 1)
-    make(raw, start, 75, venues=("12", "01", "24", "02"))
+    make(raw, start, 75, venues=("12", "01"))
     end = start + timedelta(days=73)
-    assert dataset.update(start, end, raw, data) > 0
+    assert dataset.update(start, end, raw, data, ["12"]) > 0
+    assert set(dataset.load(data)["venue"]) == {"12"}
     df = dataset.load(data)
     assert df["finish"].notna().mean() > 0.95 and df["exh_time"].notna().all()
 

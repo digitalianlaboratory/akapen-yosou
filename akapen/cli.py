@@ -33,6 +33,7 @@ def main(argv=None):
     u.add_argument("--start", type=_d)
     u.add_argument("--end", type=_d, default=date.today() - timedelta(days=1))
     u.add_argument("--days", type=int, default=7, help="--start 省略時、何日さかのぼるか")
+    u.add_argument("--venue", nargs="*", default=["住之江"], help="保存する場（既定: 住之江のみ）")
 
     t = sub.add_parser("boat-train", help="学習・検証して、基準を上回れば本番モデルを更新")
     t.add_argument("--test-days", type=int, default=56)
@@ -52,8 +53,9 @@ def main(argv=None):
 
     if a.cmd == "boat-update":
         from .boat.dataset import update
+        from .boat.venues import venue_code
         start = a.start or a.end - timedelta(days=a.days - 1)
-        n = update(start, a.end, RAW, DATA)
+        n = update(start, a.end, RAW, DATA, [venue_code(v) for v in a.venue] if a.venue else None)
         print(f"更新: {start}〜{a.end}（対象月の合計 {n} 行）")
 
     elif a.cmd == "boat-train":

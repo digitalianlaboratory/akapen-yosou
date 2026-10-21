@@ -53,8 +53,8 @@ def build_day(d: date, raw_dir: Path, with_results: bool = True) -> pd.DataFrame
     return df
 
 
-def update(start: date, end: date, raw_dir: Path, out_dir: Path) -> int:
-    """期間のデータを取得して月別 parquet に上書き保存。保存行数を返す。"""
+def update(start: date, end: date, raw_dir: Path, out_dir: Path, venues: list[str] | None = None) -> int:
+    """期間のデータを取得して月別 parquet に上書き保存。venues 指定時はその場だけ残す。"""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     frames = [build_day(d, raw_dir) for d in daterange(start, end)]
@@ -63,6 +63,10 @@ def update(start: date, end: date, raw_dir: Path, out_dir: Path) -> int:
         return 0
     new = pd.concat(frames, ignore_index=True)
     new = new[new["finish_raw"].notna()]
+    if venues:
+        new = new[new["venue"].isin(venues)]
+    if new.empty:
+        return 0
     n = 0
     for month, part in new.groupby(new["date"].str[:7]):
         path = out_dir / f"{month}.parquet"
