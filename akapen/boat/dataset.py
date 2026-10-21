@@ -30,6 +30,8 @@ def build_day(d: date, raw_dir: Path, with_results: bool = True) -> pd.DataFrame
     bs = ParseStats()
     prog = pd.DataFrame(parse_program(b, d, bs))
     log.info("%s B: %s", d, bs.summary())
+    for line in bs.skipped[:3]:
+        log.warning("読めなかった行: %r", line)
     if prog.empty:
         return prog
     k = fetch_text("K", d, raw_dir) if with_results else None
