@@ -8,7 +8,9 @@
 """
 from __future__ import annotations
 
+import http.client
 import io
+import logging
 import time
 import urllib.error
 import urllib.request
@@ -19,6 +21,8 @@ import lhafile
 
 BASE = "https://www1.mbrace.or.jp/od2"
 UA = "akapen-yosou/0.1 (personal research)"
+RETRIES = 5
+log = logging.getLogger(__name__)
 
 
 def url_for(kind: str, d: date) -> str:
@@ -44,17 +48,28 @@ def fetch_text(kind: str, d: date, raw_dir: Path, sleep: float = 1.0) -> str | N
     if missing.exists() and d < date.today():
         return None
     req = urllib.request.Request(url_for(kind, d), headers={"User-Agent": UA})
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            data = r.read()
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            missing.parent.mkdir(parents=True, exist_ok=True)
-            missing.touch()
-            return None
-        raise
-    finally:
-        time.sleep(sleep)
+    data = None
+    for attempt in range(RETRIES):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = r.read()
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                missing.parent.mkdir(parents=True, exist_ok=True)
+                missing.touch()
+                return None
+            err = e
+        except (urllib.error.URLError, http.client.HTTPException, ConnectionError, TimeoutError) as e:
+            err = e
+        finally:
+            time.sleep(sleep)
+        wait = 10 * 3 ** attempt
+        log.warning("%s %s 取得失敗（%s）、%d秒後に再試行", kind, d, err, wait)
+        time.sleep(wait)
+    if data is None:
+        log.error("%s %s は取得できなかったので飛ばします（次回の更新で再取得）", kind, d)
+        return None
     text = _extract_text(data)
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(text, encoding="utf-8")

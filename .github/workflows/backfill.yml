@@ -36,7 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 340
     strategy:
-      max-parallel: 4
+      fail-fast: false
+      max-parallel: 2
       matrix:
         chunk: ${{ fromJson(needs.plan.outputs.chunks) }}
     steps:
@@ -47,7 +48,19 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: rm -f data/boat/races/*.parquet
+      - name: 取得済みファイルの復元
+        uses: actions/cache/restore@v4
+        with:
+          path: data/boat/raw
+          key: boat-raw-${{ matrix.chunk.start }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: boat-raw-${{ matrix.chunk.start }}-
       - run: python -m akapen.cli boat-update --start ${{ matrix.chunk.start }} --end ${{ matrix.chunk.end }}
+      - name: 取得済みファイルを保存（失敗しても次回の続きに使う）
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/boat/raw
+          key: boat-raw-${{ matrix.chunk.start }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v4
         with:
           name: races-${{ matrix.chunk.start }}
