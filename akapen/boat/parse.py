@@ -18,11 +18,16 @@ _BLOCK_END = re.compile(r"^(\d{2})([BK])END")
 _RACE_HDR = re.compile(r"^\s*(\d{1,2})R\s+(.*?)\s*H(\d{3,4})m")
 _CLOSE = re.compile(r"締切予定\s*(\d{1,2}):(\d{2})")
 _WEATHER = re.compile(r"H\d{3,4}m\s+(\S+)\s+風\s+(\S+)\s+(\d+)m\s+波\s+(\d+)cm")
-_B_ENTRY = re.compile(
-    r"^([1-6])\s(\d{4})(\D+?)(\d{2})(\D{2})(\d{2})([AB][12])\s*"
-    r"(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+"
-    r"(\d+)\s+(\d+\.\d+)\s+(\d+)\s+(\d+\.\d+)(.*)$"
-)
+# 番組表の出走行は固定幅。2連率が 100.00 のときやボート番号が3桁のときは隣の欄とくっつくため、
+# 空白区切りではなく桁位置で切り出す（実ファイルで確認済み）。
+_B_COLS = {
+    "toban": (2, 6), "name": (6, 10), "age": (10, 12), "branch": (12, 14), "weight": (14, 16),
+    "racer_class": (16, 18), "nat_win": (18, 23), "nat_2r": (23, 29), "loc_win": (29, 34),
+    "loc_2r": (34, 40), "motor_no": (40, 43), "motor_2r": (43, 49), "boat_id": (49, 52),
+    "boat_2r": (52, 58), "kon_results": (58, 71),
+}
+_B_INT = {"age", "weight", "motor_no", "boat_id"}
+_B_FLOAT = {"nat_win", "nat_2r", "loc_win", "loc_2r", "motor_2r", "boat_2r"}
 _TANSHO = re.compile(r"単勝\s+([1-6])\s+(\d+)")
 _SANRENTAN = re.compile(r"3連単\s+([1-6]-[1-6]-[1-6])\s+(\d+)")
 
@@ -46,6 +51,28 @@ def _f(s):
         return float(s)
     except (TypeError, ValueError):
         return None
+
+
+def _b_entry(raw: str) -> dict | None:
+    """出走1行（正規化前の文字列）→ 辞書。形式が合わなければ None。"""
+    if len(raw) < 58:
+        return None
+    row = {"boat_no": int(raw[0])}
+    try:
+        for k, (a, b) in _B_COLS.items():
+            v = unicodedata.normalize("NFKC", raw[a:b]).strip()
+            if k in _B_INT:
+                v = int(v)
+            elif k in _B_FLOAT:
+                v = float(v)
+            elif k == "name":
+                v = re.sub(r"\s+", "", v)
+            row[k] = v
+    except ValueError:
+        return None
+    if row["racer_class"] not in CLASS_RANK or not row["toban"].isdigit():
+        return None
+    return row
 
 
 def parse_program(text: str, d: date, stats: ParseStats | None = None) -> list[dict]:
@@ -76,22 +103,13 @@ def parse_program(text: str, d: date, stats: ParseStats | None = None) -> list[d
             continue
         if race is None:
             continue
-        if m := _B_ENTRY.match(line):
-            g = m.groups()
-            rows.append({
-                "date": d.isoformat(), "venue": venue, **race,
-                "boat_no": int(g[0]), "toban": g[1],
-                "name": re.sub(r"\s+", "", g[2]), "age": int(g[3]), "branch": g[4],
-                "weight": int(g[5]), "racer_class": g[6],
-                "nat_win": float(g[7]), "nat_2r": float(g[8]),
-                "loc_win": float(g[9]), "loc_2r": float(g[10]),
-                "motor_no": int(g[11]), "motor_2r": float(g[12]),
-                "boat_id": int(g[13]), "boat_2r": float(g[14]),
-                "kon_results": g[15][:14].strip(),
-            })
+        if re.match(r"^[1-6]\s\d{4}", line):
+            row = _b_entry(raw.rstrip("\r\n"))
+            if row is None:
+                stats.skipped.append(line)
+                continue
+            rows.append({"date": d.isoformat(), "venue": venue, **race, **row})
             stats.entries += 1
-        elif re.match(r"^[1-6]\s\d{4}", line):
-            stats.skipped.append(line)
     return rows
 
 

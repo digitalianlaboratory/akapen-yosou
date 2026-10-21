@@ -13,8 +13,9 @@ from .synth import make
 B_SAMPLE = """12BBGN
 ボートレース住之江
 　１Ｒ　　予選　　　　　　　　Ｈ１８００ｍ　　電話投票締切予定１０：３３
-1 4320峰　　竜太42佐賀51A1 7.85 55.10 8.20 60.00 34 38.46 56 35.29 1 1 3 2
-2 4444山田太郎30大阪52B1 5.10 30.00 4.90 28.50 12 30.00 20 31.00 4 5
+1 3685荒井輝年52岡山56A2 5.44 36.26 5.03 26.67 29 29.59105 48.36 15445142    10
+2 4243西村　歩40大阪47B1 5.54 38.89 3.18  0.00 73 31.95107 26.88 644 551      7
+5 4448青木玄太39滋賀52A1 6.64 47.62 9.63100.00 62  0.00 29 35.61               
 12BEND
 """
 K_SAMPLE = """12KBGN
@@ -32,11 +33,16 @@ K_SAMPLE = """12KBGN
 def test_parse_program():
     st = ParseStats()
     rows = parse_program(B_SAMPLE, date(2026, 10, 20), st)
-    assert st.races == 1 and len(rows) == 2 and not st.skipped
+    # 実ファイルの行（欄がくっつく例を含む）
+    assert st.races == 1 and len(rows) == 3 and not st.skipped
     r = rows[0]
     assert (r["venue"], r["race_no"], r["distance"], r["close_time"]) == ("12", 1, 1800, "10:33")
-    assert (r["toban"], r["name"], r["age"], r["branch"], r["racer_class"]) == ("4320", "峰竜太", 42, "佐賀", "A1")
-    assert (r["nat_win"], r["motor_no"], r["motor_2r"], r["boat_2r"]) == (7.85, 34, 38.46, 35.29)
+    assert (r["toban"], r["name"], r["age"], r["branch"], r["weight"], r["racer_class"]) == ("3685", "荒井輝年", 52, "岡山", 56, "A2")
+    assert (r["nat_win"], r["nat_2r"], r["loc_win"], r["loc_2r"]) == (5.44, 36.26, 5.03, 26.67)
+    assert (r["motor_no"], r["motor_2r"], r["boat_id"], r["boat_2r"]) == (29, 29.59, 105, 48.36)
+    assert r["kon_results"] == "15445142"
+    assert rows[1]["name"] == "西村歩" and rows[1]["loc_2r"] == 0.0
+    assert rows[2]["loc_2r"] == 100.0 and rows[2]["motor_2r"] == 0.0 and rows[2]["kon_results"] == ""
 
 
 def test_parse_results():
