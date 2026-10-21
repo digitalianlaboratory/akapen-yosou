@@ -56,6 +56,6 @@ jobs:
         run: |
           git config user.name "akapen-bot"
           git config user.email "akapen-bot@users.noreply.github.com"
-          for p in data/boat/races models/boat predictions; do [ -e "$p" ] && git add "$p"; done
+          for p in data/boat/races models/boat predictions; do if [ -e "$p" ]; then git add "$p"; fi; done
           git diff --cached --quiet || git commit -m "データ更新 $(TZ=Asia/Tokyo date +%F)"
           git push
