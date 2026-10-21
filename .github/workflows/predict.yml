@@ -39,10 +39,11 @@ jobs:
         with:
           name: yosou-pdf
           path: output/*.pdf
-      - name: 予想を記録（あとで答え合わせ）
+      - name: 予想を記録（あとで答え合わせ）・PDFをリポジトリにも保存
         run: |
           git config user.name "akapen-bot"
           git config user.email "akapen-bot@users.noreply.github.com"
-          git add predictions
+          mkdir -p pdf && cp output/*.pdf pdf/
+          git add predictions pdf
           git diff --cached --quiet || git commit -m "予想記録 $(TZ=Asia/Tokyo date +%F)"
           git pull --rebase && git push
