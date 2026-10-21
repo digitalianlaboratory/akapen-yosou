@@ -1,0 +1,80 @@
+name: 過去データの一括取得と初回学習
+
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: "さかのぼる年数（1〜6）"
+        default: "4"
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      chunks: ${{ steps.p.outputs.chunks }}
+    steps:
+      - id: p
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from datetime import date, timedelta
+          y = int("${{ inputs.years }}")
+          end = date.today() - timedelta(days=1)
+          chunks = []
+          for k in range(y):
+              s = date(end.year - k - 1, end.month, 1)
+              e = date(end.year - k, end.month, 1) - timedelta(days=1) if k else end
+              chunks.append({"start": s.isoformat(), "end": e.isoformat()})
+          print("chunks=" + json.dumps(chunks))
+          PY
+
+  fetch:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      max-parallel: 4
+      matrix:
+        chunk: ${{ fromJson(needs.plan.outputs.chunks) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: rm -f data/boat/races/*.parquet
+      - run: python -m akapen.cli boat-update --start ${{ matrix.chunk.start }} --end ${{ matrix.chunk.end }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: races-${{ matrix.chunk.start }}
+          path: data/boat/races/*.parquet
+
+  train:
+    needs: fetch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: races-*
+          path: data/boat/races
+          merge-multiple: true
+      - run: ls data/boat/races | head -100
+      - run: python -m akapen.cli boat-train
+      - name: 結果を保存
+        run: |
+          git config user.name "akapen-bot"
+          git config user.email "akapen-bot@users.noreply.github.com"
+          git add data/boat/races models/boat
+          git diff --cached --quiet || git commit -m "過去データ取得と初回学習"
+          git pull --rebase
+          git push
