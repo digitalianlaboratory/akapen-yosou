@@ -63,13 +63,14 @@ def test_history_uses_only_past():
 def test_end_to_end(tmp_path):
     raw, data, mdl, pred = tmp_path / "raw", tmp_path / "data", tmp_path / "model", tmp_path / "pred"
     start = date(2026, 1, 1)
-    make(raw, start, 75)
+    make(raw, start, 75, venues=("12", "01", "24", "02"))
     end = start + timedelta(days=73)
     assert dataset.update(start, end, raw, data) > 0
     df = dataset.load(data)
     assert df["finish"].notna().mean() > 0.95 and df["exh_time"].notna().all()
 
-    rep = model.train(df, mdl, test_days=14)
+    rep = model.train(df, mdl, test_days=14, focus_venue="12")
+    assert rep["focus_venue"] == "12" and rep["test"]["races"] < 200
     # 架空データは枠・選手の強さ・モーターで結果が決まるので、枠だけの基準を上回れるはず
     assert rep["promoted"], rep
     assert rep["test"]["logloss"] < rep["baseline_lane"]["logloss"]

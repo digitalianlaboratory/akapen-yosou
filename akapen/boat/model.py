@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import lightgbm as lgb
@@ -119,12 +119,16 @@ def trifecta(p: dict, top_n: int = 10) -> list[tuple[tuple[int, int, int], float
     return res[:top_n]
 
 
-def lane_baseline(df: pd.DataFrame) -> np.ndarray:
-    raw = df["boat_no"].map(F.LANE_PRIOR_WIN).values.astype(float)
-    return normalize(df, raw, 1)
+def lane_baseline(te: pd.DataFrame, tr: pd.DataFrame) -> np.ndarray:
+    """学習期間のその場の枠別1着率だけで予想した場合（比較の基準）。"""
+    rate = tr.groupby(["venue", "boat_no"])["y_win"].mean()
+    raw = pd.Series(list(zip(te["venue"], te["boat_no"]))).map(rate).fillna(
+        te["boat_no"].map(F.LANE_PRIOR_WIN).reset_index(drop=True)).values.astype(float)
+    return normalize(te, raw, 1)
 
 
-def train(data: pd.DataFrame, model_dir: Path, test_days: int = 28, today: date | None = None) -> dict:
+def train(data: pd.DataFrame, model_dir: Path, test_days: int = 56, focus_venue: str | None = "12") -> dict:
+    """focus_venue の検証成績で選ぶ。学習データは「全場」と「その場だけ」の両方を試す。"""
     model_dir = Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
     data = labels(usable(data))
@@ -132,37 +136,48 @@ def train(data: pd.DataFrame, model_dir: Path, test_days: int = 28, today: date 
     end = pd.to_datetime(feats["date"]).max()
     cutoff = (end - timedelta(days=test_days - 1)).strftime("%Y-%m-%d")
     tr, te = feats[feats["date"] < cutoff], feats[feats["date"] >= cutoff]
+    if focus_venue:
+        te = te[te["venue"] == focus_venue]
     if tr[RACE].drop_duplicates().shape[0] < 500 or te.empty:
         raise RuntimeError(f"学習データが足りません（学習 {len(tr)} 行／検証 {len(te)} 行）")
     log.info("学習 %s〜%s / 検証 %s〜%s", tr["date"].min(), tr["date"].max(), te["date"].min(), te["date"].max())
 
-    base = evaluate(te, lane_baseline(te))
+    base = evaluate(te, lane_baseline(te, tr))
     natwin = te.groupby(RACE)["nat_win"].transform(lambda s: np.exp(s - s.max()))
     base_nat = evaluate(te, normalize(te, natwin.values, 1))
     te_eval = te.copy()
     te_eval[PRE_COLS] = np.nan  # 直前情報なしの成績も別に出す
+    pools = {"all": None}
+    if focus_venue and (tr["venue"] == focus_venue).any():
+        pools["focus"] = focus_venue
     best = None
-    for i, cfg in enumerate(CONFIGS):
-        m = _fit(tr, "y_win", cfg)
-        pw = normalize(te, m.predict_proba(te[F.FEATURES])[:, 1], 1)
-        ev = evaluate(te, pw)
-        log.info("設定%d: %s", i, ev)
-        if best is None or ev["logloss"] < best[2]["logloss"]:
-            pw_no = normalize(te_eval, m.predict_proba(te_eval[F.FEATURES])[:, 1], 1)
-            best = (i, cfg, ev, evaluate(te_eval, pw_no))
+    for pool, v in pools.items():
+        sub = tr if v is None else tr[tr["venue"] == v]
+        if sub[RACE].drop_duplicates().shape[0] < 500:
+            continue
+        for i, cfg in enumerate(CONFIGS):
+            m = _fit(sub, "y_win", cfg)
+            pw = normalize(te, m.predict_proba(te[F.FEATURES])[:, 1], 1)
+            ev = evaluate(te, pw)
+            log.info("学習=%s 設定%d: %s", pool, i, ev)
+            if best is None or ev["logloss"] < best[2]["logloss"]:
+                pw_no = normalize(te_eval, m.predict_proba(te_eval[F.FEATURES])[:, 1], 1)
+                best = (pool, cfg, ev, evaluate(te_eval, pw_no))
 
-    i, cfg, ev, ev_no_pre = best
+    pool, cfg, ev, ev_no_pre = best
     report = {
         "trained_at": datetime.now().isoformat(timespec="seconds"),
         "train_range": [tr["date"].min(), tr["date"].max()],
         "test_range": [te["date"].min(), te["date"].max()],
+        "focus_venue": focus_venue, "train_pool": pool,
         "config": cfg, "test": ev, "test_without_pre_race": ev_no_pre,
         "baseline_lane": base, "baseline_nat_win": base_nat,
         "promoted": ev["logloss"] < base["logloss"],
     }
     if report["promoted"]:
-        full_win = _fit(feats, "y_win", cfg)
-        full_top3 = _fit(feats, "y_top3", cfg)
+        full = feats if pool == "all" else feats[feats["venue"] == focus_venue]
+        full_win = _fit(full, "y_win", cfg)
+        full_top3 = _fit(full, "y_top3", cfg)
         full_win.booster_.save_model(str(model_dir / "win.txt"))
         full_top3.booster_.save_model(str(model_dir / "top3.txt"))
         (model_dir / "meta.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -35,11 +35,12 @@ def main(argv=None):
     u.add_argument("--days", type=int, default=7, help="--start 省略時、何日さかのぼるか")
 
     t = sub.add_parser("boat-train", help="学習・検証して、基準を上回れば本番モデルを更新")
-    t.add_argument("--test-days", type=int, default=28)
+    t.add_argument("--test-days", type=int, default=56)
+    t.add_argument("--venue", default="住之江", help="検証・選択の対象にする場（空文字で全場）")
 
     p = sub.add_parser("boat-predict", help="指定レースを予想してPDFに出力")
     p.add_argument("--date", type=_d, default=date.today())
-    p.add_argument("--venue", nargs="*", help="場名か場コード（省略で全場）")
+    p.add_argument("--venue", nargs="*", default=["住之江"], help="場名か場コード（既定: 住之江）")
     p.add_argument("--race", nargs="*", type=int)
     p.add_argument("--pre", type=Path, help="直前情報CSV（date無し, 列: venue,race_no,boat_no,exh_time,wind_speed,wave）")
     p.add_argument("--out", type=Path)
@@ -58,7 +59,9 @@ def main(argv=None):
     elif a.cmd == "boat-train":
         from .boat.dataset import load
         from .boat.model import train
-        rep = train(load(DATA), MODEL, test_days=a.test_days)
+        from .boat.venues import venue_code
+        rep = train(load(DATA), MODEL, test_days=a.test_days,
+                    focus_venue=venue_code(a.venue) if a.venue else None)
         print(json.dumps(rep, ensure_ascii=False, indent=2))
 
     elif a.cmd == "boat-predict":
