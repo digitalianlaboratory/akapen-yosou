@@ -1,0 +1,14 @@
+{
+  "all": {
+    "races": 12,
+    "honmei_win": 0.5833333333333334,
+    "honmei_top3": 1.0,
+    "trifecta_6pt": 0.5
+  },
+  "last_7d": {
+    "races": 12,
+    "honmei_win": 0.5833333333333334,
+    "honmei_top3": 1.0,
+    "trifecta_6pt": 0.5
+  }
+}
