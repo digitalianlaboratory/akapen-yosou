@@ -1,12 +1,12 @@
 {
-  "trained_at": "2026-11-08T20:16:36",
+  "trained_at": "2026-11-15T20:53:58",
   "train_range": [
     "2022-10-02",
-    "2026-09-12"
+    "2026-09-15"
   ],
   "test_range": [
-    "2026-09-13",
-    "2026-11-07"
+    "2026-09-16",
+    "2026-11-10"
   ],
   "focus_venue": "12",
   "train_pool": "all",
@@ -18,38 +18,38 @@
   },
   "test": {
     "races": 372,
-    "logloss": 1.1468281000933407,
-    "honmei_win": 0.5725806451612904,
-    "honmei_top3": 0.8575268817204301,
-    "honmei_tansho_roi": 0.871505376344086,
-    "trifecta_top1": 0.10752688172043011,
-    "trifecta_top10": 0.49193548387096775
+    "logloss": 1.1484511058650997,
+    "honmei_win": 0.5860215053763441,
+    "honmei_top3": 0.8709677419354839,
+    "honmei_tansho_roi": 0.8916666666666667,
+    "trifecta_top1": 0.10483870967741936,
+    "trifecta_top10": 0.5161290322580645
   },
   "test_without_pre_race": {
     "races": 372,
-    "logloss": 1.1632579606445133,
-    "honmei_win": 0.5860215053763441,
-    "honmei_top3": 0.8629032258064516,
-    "honmei_tansho_roi": 0.896774193548387,
-    "trifecta_top1": 0.09946236559139784,
-    "trifecta_top10": 0.5053763440860215
+    "logloss": 1.1543586033247915,
+    "honmei_win": 0.5913978494623656,
+    "honmei_top3": 0.8709677419354839,
+    "honmei_tansho_roi": 0.9131720430107527,
+    "trifecta_top1": 0.10752688172043011,
+    "trifecta_top10": 0.5134408602150538
   },
   "baseline_lane": {
     "races": 372,
-    "logloss": 1.302754066448397,
-    "honmei_win": 0.5672043010752689,
-    "honmei_top3": 0.8387096774193549,
-    "honmei_tansho_roi": 0.8881720430107527,
-    "trifecta_top1": 0.06451612903225806,
-    "trifecta_top10": 0.4112903225806452
+    "logloss": 1.2675557261730286,
+    "honmei_win": 0.5887096774193549,
+    "honmei_top3": 0.8521505376344086,
+    "honmei_tansho_roi": 0.9094086021505376,
+    "trifecta_top1": 0.07526881720430108,
+    "trifecta_top10": 0.42473118279569894
   },
   "baseline_nat_win": {
     "races": 372,
-    "logloss": 1.6596499387218957,
-    "honmei_win": 0.3064516129032258,
-    "honmei_top3": 0.7688172043010753,
-    "honmei_tansho_roi": 0.7263440860215054,
-    "trifecta_top1": 0.03763440860215054,
+    "logloss": 1.6996120961196646,
+    "honmei_win": 0.3010752688172043,
+    "honmei_top3": 0.75,
+    "honmei_tansho_roi": 0.7188172043010753,
+    "trifecta_top1": 0.043010752688172046,
     "trifecta_top10": 0.26344086021505375
   },
   "promoted": true
